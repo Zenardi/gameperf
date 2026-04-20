@@ -199,7 +199,6 @@ gameperf report --llm          # AI section appended to the markdown file
 ### Mode 2 — OpenAI (cloud, requires API key)
 
 ```bash
-# Store your key in the config file (never use it as a CLI flag)
 mkdir -p ~/.config/gameperf
 cat > ~/.config/gameperf/config.toml << 'EOF'
 [llm]
@@ -211,15 +210,31 @@ EOF
 gameperf diagnose --llm
 ```
 
+### Mode 3 — Google Gemini (cloud, requires API key)
+
+Get a free API key at [aistudio.google.com](https://aistudio.google.com/app/apikey).
+
+```bash
+mkdir -p ~/.config/gameperf
+cat > ~/.config/gameperf/config.toml << 'EOF'
+[llm]
+provider = "gemini"
+model    = "gemini-1.5-flash"
+api_key  = "AIza..."
+EOF
+
+gameperf diagnose --llm
+```
+
 ### Config file reference
 
 `~/.config/gameperf/config.toml` — created manually, never auto-generated.
 
 ```toml
 [llm]
-provider = "ollama"           # "ollama" (default) or "openai"
+provider = "ollama"           # "ollama" (default), "openai", or "gemini"
 model    = "llama3.2"         # any model available in your provider
-api_key  = ""                 # required for openai; leave empty for ollama
+api_key  = ""                 # required for openai/gemini; leave empty for ollama
 url      = ""                 # override base URL; empty = provider default
 ```
 
@@ -345,7 +360,8 @@ gameperf/
     │   ├── config.go     # LLMConfig, LoadConfig, NewFromConfig
     │   ├── enhance.go    # BuildPrompt, EnhanceReport
     │   ├── ollama.go     # Ollama HTTP client
-    │   └── openai.go     # OpenAI chat completions client
+    │   ├── openai.go     # OpenAI chat completions client
+    │   └── gemini.go     # Google Gemini generateContent client
     └── report/           # Output formatters
         └── report.go     # WriteConsole / WriteMarkdown / WriteJSON
 ```
