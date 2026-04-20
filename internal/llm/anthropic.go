@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -90,16 +91,28 @@ func (p *AnthropicProvider) Complete(ctx context.Context, prompt string) (string
 	}
 	defer resp.Body.Close()
 
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("anthropic read body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errBody struct {
+			Error struct{ Message string `json:"message"` } `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(rawBody, &errBody); jsonErr == nil && errBody.Error.Message != "" {
+			return "", fmt.Errorf("anthropic error: %s", errBody.Error.Message)
+		}
+		return "", fmt.Errorf("anthropic returned HTTP %d: %s", resp.StatusCode, string(rawBody))
+	}
+
 	var result anthropicResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("anthropic decode: %w", err)
+	if err := json.Unmarshal(rawBody, &result); err != nil {
+		return "", fmt.Errorf("anthropic decode: %w\nraw response: %s", err, string(rawBody))
 	}
 
 	if result.Error != nil {
 		return "", fmt.Errorf("anthropic error: %s", result.Error.Message)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("anthropic returned HTTP %d", resp.StatusCode)
 	}
 	if len(result.Content) == 0 {
 		return "", fmt.Errorf("anthropic returned no content")

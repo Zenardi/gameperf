@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -86,16 +87,37 @@ func (p *GeminiProvider) Complete(ctx context.Context, prompt string) (string, e
 	}
 	defer resp.Body.Close()
 
+	// Read the full body so we can show it on errors.
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("gemini read body: %w", err)
+	}
+
+	// Surface non-200 errors before attempting JSON decode, because error
+	// responses (quota exceeded, payload too large, auth failures, etc.) may
+	// contain numeric fields that confuse our response struct.
+	if resp.StatusCode != http.StatusOK {
+		// Try to extract a human-readable message from the error body.
+		var errBody struct {
+			Error struct {
+				Message string `json:"message"`
+				Status  string `json:"status"`
+				Code    int    `json:"code"`
+			} `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(rawBody, &errBody); jsonErr == nil && errBody.Error.Message != "" {
+			return "", fmt.Errorf("gemini error (%s): %s", errBody.Error.Status, errBody.Error.Message)
+		}
+		return "", fmt.Errorf("gemini returned HTTP %d: %s", resp.StatusCode, string(rawBody))
+	}
+
 	var result geminiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("gemini decode: %w", err)
+	if err := json.Unmarshal(rawBody, &result); err != nil {
+		return "", fmt.Errorf("gemini decode: %w\nraw response: %s", err, string(rawBody))
 	}
 
 	if result.Error != nil {
 		return "", fmt.Errorf("gemini error: %s", result.Error.Message)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("gemini returned HTTP %d", resp.StatusCode)
 	}
 	if len(result.Candidates) == 0 || len(result.Candidates[0].Content.Parts) == 0 {
 		return "", fmt.Errorf("gemini returned no candidates")

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -80,17 +81,28 @@ func (p *OpenAIProvider) Complete(ctx context.Context, prompt string) (string, e
 	}
 	defer resp.Body.Close()
 
-	var result openAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("openai decode: %w", err)
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("openai read body: %w", err)
 	}
 
-	// OpenAI returns error details in the body even on non-200 responses.
+	if resp.StatusCode != http.StatusOK {
+		var errBody struct {
+			Error struct{ Message string `json:"message"` } `json:"error"`
+		}
+		if jsonErr := json.Unmarshal(rawBody, &errBody); jsonErr == nil && errBody.Error.Message != "" {
+			return "", fmt.Errorf("openai error: %s", errBody.Error.Message)
+		}
+		return "", fmt.Errorf("openai returned HTTP %d: %s", resp.StatusCode, string(rawBody))
+	}
+
+	var result openAIResponse
+	if err := json.Unmarshal(rawBody, &result); err != nil {
+		return "", fmt.Errorf("openai decode: %w\nraw response: %s", err, string(rawBody))
+	}
+
 	if result.Error != nil {
 		return "", fmt.Errorf("openai error: %s", result.Error.Message)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("openai returned HTTP %d", resp.StatusCode)
 	}
 	if len(result.Choices) == 0 {
 		return "", fmt.Errorf("openai returned no choices")
