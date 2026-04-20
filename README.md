@@ -6,9 +6,21 @@ Real-time game performance diagnostics and auto-fix tool for Linux.
 
 Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game.
 
+![grafana-gpu](./docs/grafana-gpu.png)
+
+&nbsp;
+
+![grafana-cpu](./docs/grafana-cpu.png)
+
+
 - [gameperf](#gameperf)
   - [Features](#features)
-  - [Requirements](#requirements)
+  - [Prerequisites](#prerequisites)
+    - [Required](#required)
+    - [Runtime tools (auto-fixes won't work without these)](#runtime-tools-auto-fixes-wont-work-without-these)
+    - [GPU metrics (optional)](#gpu-metrics-optional)
+    - [Monitoring stack (optional)](#monitoring-stack-optional)
+    - [LLM analysis (optional)](#llm-analysis-optional)
   - [Installation](#installation)
     - [Build from source](#build-from-source)
     - [Run without installing](#run-without-installing)
@@ -17,8 +29,10 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
     - [`fix` — diagnose and apply all auto-fixable issues](#fix--diagnose-and-apply-all-auto-fixable-issues)
     - [`monitor` — continuous re-diagnosis](#monitor--continuous-re-diagnosis)
     - [`report` — write a full report to a file](#report--write-a-full-report-to-a-file)
+    - [`analyze-file` — send a saved report to the LLM](#analyze-file--send-a-saved-report-to-the-llm)
     - [`serve` — Prometheus metrics endpoint](#serve--prometheus-metrics-endpoint)
     - [Common flags](#common-flags)
+    - [Game auto-detection](#game-auto-detection)
   - [Prometheus + Grafana monitoring stack](#prometheus--grafana-monitoring-stack)
     - [Metrics exposed](#metrics-exposed)
     - [Quickstart](#quickstart)
