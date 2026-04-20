@@ -192,7 +192,7 @@ game and gameperf do not need to be running.
 
 ```bash
 gameperf analyze-file gameperf-report.md
-gameperf analyze-file /tmp/session.json --llm-provider gemini --llm-model gemini-2.0-flash
+gameperf analyze-file /tmp/session.json --llm-provider gemini --llm-model gemini-2.5-flash
 ```
 
 The file contents (markdown, JSON, or plain text) are sent verbatim to the
@@ -349,7 +349,7 @@ mkdir -p ~/.config/gameperf
 cat > ~/.config/gameperf/config.toml << 'EOF'
 [llm]
 provider = "gemini"
-model    = "gemini-2.0-flash"
+model    = "gemini-2.5-flash"
 api_key  = "AIza..."
 EOF
 
