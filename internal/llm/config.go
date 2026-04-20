@@ -82,6 +82,8 @@ func NewFromConfig(cfg LLMConfig) (Provider, error) {
 		return NewOpenAIProvider(cfg.Model, cfg.APIKey, cfg.URL), nil
 	case "gemini":
 		return NewGeminiProvider(cfg.Model, cfg.APIKey, cfg.URL), nil
+	case "anthropic":
+		return NewAnthropicProvider(cfg.Model, cfg.APIKey, cfg.URL), nil
 	default: // "ollama" or anything unknown
 		url := cfg.URL
 		if url == "" {

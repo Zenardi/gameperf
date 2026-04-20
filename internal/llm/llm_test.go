@@ -384,5 +384,185 @@ func TestNewFromConfig_UnknownProvider_FallsBackToOllama(t *testing.T) {
 	}
 }
 
+func TestNewFromConfig_Gemini(t *testing.T) {
+	t.Parallel()
+	cfg := llm.LLMConfig{Provider: "gemini", Model: "gemini-1.5-flash", APIKey: "AIza-test"}
+	p, err := llm.NewFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(p.Name(), "gemini") {
+		t.Errorf("expected gemini provider, got %q", p.Name())
+	}
+}
+
+// ── GeminiProvider ────────────────────────────────────────────────────────────
+
+func TestGeminiProvider_Name(t *testing.T) {
+	t.Parallel()
+	p := llm.NewGeminiProvider("gemini-1.5-flash", "AIza-test", "")
+	if !strings.Contains(p.Name(), "gemini") {
+		t.Errorf("Name() = %q, want 'gemini'", p.Name())
+	}
+	if !strings.Contains(p.Name(), "gemini-1.5-flash") {
+		t.Errorf("Name() = %q, want model name", p.Name())
+	}
+}
+
+func TestGeminiProvider_Complete(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "generateContent") {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("key") != "AIza-test" {
+			t.Errorf("missing or wrong API key in query: %s", r.URL.RawQuery)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"candidates": []map[string]any{
+				{"content": map[string]any{
+					"parts": []map[string]string{{"text": "gemini says hello"}},
+				}},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	p := llm.NewGeminiProvider("gemini-1.5-flash", "AIza-test", srv.URL)
+	got, err := p.Complete(context.Background(), "analyse my game")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(got, "gemini says hello") {
+		t.Errorf("got %q, want 'gemini says hello'", got)
+	}
+}
+
+func TestGeminiProvider_Complete_APIError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]any{"message": "API key not valid"},
+		})
+	}))
+	defer srv.Close()
+
+	p := llm.NewGeminiProvider("gemini-1.5-flash", "bad-key", srv.URL)
+	_, err := p.Complete(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error on 400 response")
+	}
+	if !strings.Contains(err.Error(), "API key not valid") {
+		t.Errorf("error should contain API message, got: %v", err)
+	}
+}
+
+func TestGeminiProvider_Complete_EmptyCandidates(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"candidates": []any{}})
+	}))
+	defer srv.Close()
+
+	p := llm.NewGeminiProvider("gemini-1.5-flash", "AIza-x", srv.URL)
+	_, err := p.Complete(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error when candidates is empty")
+	}
+}
+
+// ── AnthropicProvider ─────────────────────────────────────────────────────────
+
+func TestNewFromConfig_Anthropic(t *testing.T) {
+	t.Parallel()
+	cfg := llm.LLMConfig{Provider: "anthropic", Model: "claude-3-5-haiku-20241022", APIKey: "sk-ant-test"}
+	p, err := llm.NewFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(p.Name(), "anthropic") {
+		t.Errorf("expected anthropic provider, got %q", p.Name())
+	}
+}
+
+func TestAnthropicProvider_Name(t *testing.T) {
+	t.Parallel()
+	p := llm.NewAnthropicProvider("claude-3-5-haiku-20241022", "sk-ant-test", "")
+	if !strings.Contains(p.Name(), "anthropic") {
+		t.Errorf("Name() = %q, want 'anthropic'", p.Name())
+	}
+	if !strings.Contains(p.Name(), "claude-3-5-haiku-20241022") {
+		t.Errorf("Name() = %q, want model name", p.Name())
+	}
+}
+
+func TestAnthropicProvider_Complete(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/messages" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("x-api-key") != "sk-ant-test" {
+			t.Errorf("missing or wrong x-api-key header: %q", r.Header.Get("x-api-key"))
+		}
+		if r.Header.Get("anthropic-version") == "" {
+			t.Error("missing anthropic-version header")
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"content": []map[string]any{
+				{"type": "text", "text": "anthropic says hello"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	p := llm.NewAnthropicProvider("claude-3-5-haiku-20241022", "sk-ant-test", srv.URL)
+	got, err := p.Complete(context.Background(), "analyse my game")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(got, "anthropic says hello") {
+		t.Errorf("got %q, want 'anthropic says hello'", got)
+	}
+}
+
+func TestAnthropicProvider_Complete_APIError(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error": map[string]any{
+				"type":    "authentication_error",
+				"message": "invalid x-api-key",
+			},
+		})
+	}))
+	defer srv.Close()
+
+	p := llm.NewAnthropicProvider("claude-3-5-haiku-20241022", "bad-key", srv.URL)
+	_, err := p.Complete(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error on 401 response")
+	}
+	if !strings.Contains(err.Error(), "invalid x-api-key") {
+		t.Errorf("error should contain API message, got: %v", err)
+	}
+}
+
+func TestAnthropicProvider_Complete_EmptyContent(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"content": []any{}})
+	}))
+	defer srv.Close()
+
+	p := llm.NewAnthropicProvider("claude-3-5-haiku-20241022", "sk-ant-x", srv.URL)
+	_, err := p.Complete(context.Background(), "test")
+	if err == nil {
+		t.Fatal("expected error when content is empty")
+	}
+}
+
 // suppress unused import lint in case fmt is only used in error formatting
 var _ = fmt.Sprintf

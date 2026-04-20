@@ -226,15 +226,31 @@ EOF
 gameperf diagnose --llm
 ```
 
+### Mode 4 — Anthropic Claude (cloud, requires API key)
+
+Get an API key at [console.anthropic.com](https://console.anthropic.com/).
+
+```bash
+mkdir -p ~/.config/gameperf
+cat > ~/.config/gameperf/config.toml << 'EOF'
+[llm]
+provider = "anthropic"
+model    = "claude-3-5-haiku-20241022"
+api_key  = "sk-ant-..."
+EOF
+
+gameperf diagnose --llm
+```
+
 ### Config file reference
 
 `~/.config/gameperf/config.toml` — created manually, never auto-generated.
 
 ```toml
 [llm]
-provider = "ollama"           # "ollama" (default), "openai", or "gemini"
+provider = "ollama"           # "ollama" (default), "openai", "gemini", or "anthropic"
 model    = "llama3.2"         # any model available in your provider
-api_key  = ""                 # required for openai/gemini; leave empty for ollama
+api_key  = ""                 # required for openai/gemini/anthropic; leave empty for ollama
 url      = ""                 # override base URL; empty = provider default
 ```
 
@@ -361,7 +377,8 @@ gameperf/
     │   ├── enhance.go    # BuildPrompt, EnhanceReport
     │   ├── ollama.go     # Ollama HTTP client
     │   ├── openai.go     # OpenAI chat completions client
-    │   └── gemini.go     # Google Gemini generateContent client
+    │   ├── gemini.go     # Google Gemini generateContent client
+    │   └── anthropic.go  # Anthropic Messages API client
     └── report/           # Output formatters
         └── report.go     # WriteConsole / WriteMarkdown / WriteJSON
 ```
