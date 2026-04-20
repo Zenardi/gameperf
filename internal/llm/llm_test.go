@@ -475,6 +475,42 @@ func TestGeminiProvider_Complete_EmptyCandidates(t *testing.T) {
 	}
 }
 
+func TestGeminiProvider_Complete_RetriesOnUnavailable(t *testing.T) {
+	t.Parallel()
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"message": "overloaded", "status": "UNAVAILABLE", "code": 503},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"candidates": []map[string]any{
+				{"content": map[string]any{
+					"parts": []map[string]string{{"text": "recovered"}},
+				}},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	p := llm.NewGeminiProvider("gemini-2.5-flash", "AIza-test", srv.URL)
+	llm.SetGeminiBackoff(p, time.Millisecond) // fast retries in tests
+	got, err := p.Complete(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if got != "recovered" {
+		t.Errorf("got %q, want 'recovered'", got)
+	}
+	if calls != 3 {
+		t.Errorf("expected 3 calls (2 retries), got %d", calls)
+	}
+}
+
 // ── AnthropicProvider ─────────────────────────────────────────────────────────
 
 func TestNewFromConfig_Anthropic(t *testing.T) {
