@@ -21,11 +21,11 @@ type fileConfig struct {
 }
 
 // DefaultConfig returns sensible defaults: Ollama running locally.
+// URL is intentionally left empty so each provider can apply its own default.
 func DefaultConfig() LLMConfig {
 	return LLMConfig{
 		Provider: "ollama",
 		Model:    "llama3.2",
-		URL:      "http://localhost:11434",
 	}
 }
 

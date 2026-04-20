@@ -293,9 +293,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Model == "" {
 		t.Error("default model should not be empty")
 	}
-	if cfg.URL == "" {
-		t.Error("default URL should not be empty")
-	}
+	// URL is intentionally empty in DefaultConfig; each provider applies its own default.
+	// Ollama's default (http://localhost:11434) is applied in NewFromConfig, not here.
 }
 
 func TestLoadConfigFrom_ReturnsDefaults_WhenNoFile(t *testing.T) {
