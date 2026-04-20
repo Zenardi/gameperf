@@ -13,10 +13,10 @@ import (
 
 // FullReport bundles everything produced in one analysis run.
 type FullReport struct {
-	GeneratedAt time.Time
-	Snapshot    analyzer.Snapshot
-	Findings    []analyzer.Finding
-	Applied     []fixer.Result
+	GeneratedAt time.Time          `json:"generated_at"`
+	Snapshot    analyzer.Snapshot  `json:"snapshot"`
+	Findings    []analyzer.Finding `json:"findings"`
+	Applied     []fixer.Result     `json:"applied"`
 }
 
 // WriteMarkdown writes a human-readable Markdown report to w.
@@ -35,6 +35,23 @@ func WriteMarkdown(w io.Writer, r FullReport) {
 		fmt.Fprintf(w, "| GPU Clock | %d MHz |\n", g.ClockGraphics)
 		fmt.Fprintf(w, "| Driver | %s |\n", g.DriverVersion)
 		fmt.Fprintf(w, "\n")
+	}
+
+	// Memory
+	mem := r.Snapshot.MemInfo
+	if mem.MemTotal > 0 {
+		fmt.Fprintf(w, "| RAM Available | %d MiB / %d MiB (%.0f%%) |\n",
+			mem.AvailableMiB(), mem.MemTotal/1024, mem.AvailablePercent())
+		if mem.SwapTotal > 0 {
+			fmt.Fprintf(w, "| Swap Usage | %.0f%% (%d / %d MiB) |\n",
+				mem.SwapUsedPercent(), (mem.SwapTotal-mem.SwapFree)/1024, mem.SwapTotal/1024)
+		}
+	}
+	if r.Snapshot.VMMaxMapCount > 0 {
+		fmt.Fprintf(w, "| vm.max_map_count | %d |\n", r.Snapshot.VMMaxMapCount)
+	}
+	if r.Snapshot.THPMode != "" {
+		fmt.Fprintf(w, "| Transparent HugePages | %s |\n", r.Snapshot.THPMode)
 	}
 
 	if len(r.Snapshot.GameProcs) > 0 {
@@ -65,7 +82,7 @@ func WriteMarkdown(w io.Writer, r FullReport) {
 			fmt.Fprintf(w, "✅ **Auto-fixable** — run `gameperf fix` to apply automatically.\n\n")
 		}
 		if f.ManualFix != "" {
-			fmt.Fprintf(w, "**Manual fix:**\n\n%s\n\n", codeBlock(f.ManualFix))
+			fmt.Fprintf(w, "**Manual fix:**\n\n```\n%s\n```\n\n", f.ManualFix)
 		}
 		if f.InGameFix != "" {
 			fmt.Fprintf(w, "**In-game fix:**\n\n> %s\n\n", f.InGameFix)

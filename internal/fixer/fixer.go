@@ -10,10 +10,10 @@ import (
 
 // Result holds the outcome of attempting to apply a fix.
 type Result struct {
-	FindingID string
-	Applied   bool
-	Output    string
-	Err       error
+	FindingID string `json:"finding_id"`
+	Applied   bool   `json:"applied"`
+	Output    string `json:"output,omitempty"`
+	Err       error  `json:"-"`
 }
 
 // ApplyAll attempts to auto-fix all fixable findings.

@@ -16,17 +16,17 @@ const (
 
 // Finding represents a detected performance issue.
 type Finding struct {
-	ID          string
-	Severity    Severity
-	Title       string
-	Description string
-	Evidence    string // raw metric data that triggered this finding
+	ID          string   `json:"id"`
+	Severity    Severity `json:"severity"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Evidence    string   `json:"evidence,omitempty"`
 
 	// Fix guidance
-	AutoFixable  bool
-	AutoFixCmd   []string // shell command to apply the fix automatically (may require sudo)
-	ManualFix    string   // human-readable instructions for fixes that can't be automated
-	InGameFix    string   // steps to take inside the game settings
+	AutoFixable  bool     `json:"auto_fixable"`
+	AutoFixCmd   []string `json:"auto_fix_cmd,omitempty"`
+	ManualFix    string   `json:"manual_fix,omitempty"`
+	InGameFix    string   `json:"in_game_fix,omitempty"`
 }
 
 // String returns a short one-line summary.
@@ -37,17 +37,17 @@ func (f Finding) String() string {
 
 // Report is the full output of an analysis session.
 type Report struct {
-	GameProcess string
-	Findings    []Finding
-	Applied     []AppliedFix
+	GameProcess string       `json:"game_process,omitempty"`
+	Findings    []Finding    `json:"findings"`
+	Applied     []AppliedFix `json:"applied,omitempty"`
 }
 
 // AppliedFix records a fix that was executed automatically.
 type AppliedFix struct {
-	FindingID string
-	Command   string
-	Output    string
-	Error     string
+	FindingID string `json:"finding_id"`
+	Command   string `json:"command"`
+	Output    string `json:"output,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // HasCritical returns true if any finding is critical severity.

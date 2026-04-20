@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -50,13 +51,18 @@ func CollectCPUStats() ([]CPUStat, error) {
 		return nil, err
 	}
 	defer f.Close()
+	return ParseCPUStats(f)
+}
 
+// ParseCPUStats parses the /proc/stat format from any io.Reader.
+// Exposed for testing.
+func ParseCPUStats(r io.Reader) ([]CPUStat, error) {
 	var stats []CPUStat
-	scanner := bufio.NewScanner(f)
 	cpuID := 0
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.HasPrefix(line, "cpu") || line[:4] == "cpu " {
+		if !strings.HasPrefix(line, "cpu") || strings.HasPrefix(line, "cpu ") {
 			continue
 		}
 		parts := strings.Fields(line)
@@ -80,19 +86,24 @@ type CPUTopology struct {
 	MaxFreq int64 // kHz
 }
 
-// CollectCPUTopology reads max frequencies from /sys to determine P-cores vs E-cores.
+// CollectCPUTopology reads frequency data from /proc/cpuinfo.
 func CollectCPUTopology() ([]CPUTopology, error) {
 	f, err := os.Open("/proc/cpuinfo")
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+	return ParseCPUTopology(f)
+}
 
+// ParseCPUTopology parses /proc/cpuinfo topology from any io.Reader.
+// Exposed for testing.
+func ParseCPUTopology(r io.Reader) ([]CPUTopology, error) {
 	var topos []CPUTopology
 	var current CPUTopology
 	current.ID = -1
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "processor") {
@@ -115,7 +126,8 @@ func CollectCPUTopology() ([]CPUTopology, error) {
 	return topos, scanner.Err()
 }
 
-// PCoreIDs returns the CPU IDs that appear to be P-cores (highest frequency cluster).
+// PCoreIDs returns CPU IDs in the highest-frequency cluster (P-cores).
+// Cores within 10% of the maximum observed frequency are considered P-cores.
 func PCoreIDs(topos []CPUTopology) []int {
 	if len(topos) == 0 {
 		return nil
@@ -126,7 +138,6 @@ func PCoreIDs(topos []CPUTopology) []int {
 			maxFreq = t.MaxFreq
 		}
 	}
-	// P-cores are within 10% of max frequency
 	threshold := int64(float64(maxFreq) * 0.90)
 	var ids []int
 	for _, t := range topos {

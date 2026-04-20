@@ -68,7 +68,9 @@ and produces detailed reports with auto-fix support.`,
 		Short: "Run analysis and write a full report to a file",
 		RunE:  runReport,
 	}
-	addCommonFlags(reportCmd)
+	// report has its own --format flag: default is markdown, not console.
+	reportCmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
+	reportCmd.Flags().StringVar(&flagFormat, "format", "markdown", "Output format: console, markdown, json")
 	reportCmd.Flags().StringVar(&flagOutput, "output", "gameperf-report.md", "Output file path")
 
 	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd)
@@ -156,7 +158,9 @@ func runReport(cmd *cobra.Command, _ []string) error {
 	switch flagFormat {
 	case "json":
 		err = report.WriteJSON(f, r)
-	default:
+	case "console":
+		report.WriteConsole(f, r)
+	default: // markdown
 		report.WriteMarkdown(f, r)
 	}
 	if err != nil {

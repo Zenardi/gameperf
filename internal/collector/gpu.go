@@ -8,12 +8,12 @@ import (
 
 // GPUStat holds a snapshot of NVIDIA GPU metrics.
 type GPUStat struct {
-	UtilizationGPU    int    // %
-	UtilizationMemory int    // %
+	UtilizationGPU    int     // %
+	UtilizationMemory int     // %
 	PowerDraw         float64 // W
-	ClockGraphics     int    // MHz
-	MemoryUsed        int64  // MiB
-	MemoryTotal       int64  // MiB
+	ClockGraphics     int     // MHz
+	MemoryUsed        int64   // MiB
+	MemoryTotal       int64   // MiB
 	DriverVersion     string
 }
 
@@ -26,7 +26,6 @@ func (g GPUStat) MemoryUsedPercent() float64 {
 }
 
 // CollectGPU queries nvidia-smi for current GPU metrics.
-// Returns an error if nvidia-smi is not available.
 func CollectGPU() (GPUStat, error) {
 	query := "utilization.gpu,utilization.memory,power.draw,clocks.current.graphics,memory.used,memory.total,driver_version"
 	out, err := exec.Command("nvidia-smi",
@@ -36,10 +35,15 @@ func CollectGPU() (GPUStat, error) {
 	if err != nil {
 		return GPUStat{}, err
 	}
+	return ParseGPUOutput(string(out))
+}
 
-	parts := strings.Split(strings.TrimSpace(string(out)), ", ")
+// ParseGPUOutput parses a single nvidia-smi CSV line into a GPUStat.
+// Exposed for testing.
+func ParseGPUOutput(output string) (GPUStat, error) {
+	parts := strings.Split(strings.TrimSpace(output), ", ")
 	if len(parts) < 7 {
-		parts = strings.Split(strings.TrimSpace(string(out)), ",")
+		parts = strings.Split(strings.TrimSpace(output), ",")
 	}
 	if len(parts) < 7 {
 		return GPUStat{}, nil
@@ -54,7 +58,6 @@ func CollectGPU() (GPUStat, error) {
 	stat.MemoryUsed, _ = strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64)
 	stat.MemoryTotal, _ = strconv.ParseInt(strings.TrimSpace(parts[5]), 10, 64)
 	stat.DriverVersion = strings.TrimSpace(parts[6])
-
 	return stat, nil
 }
 

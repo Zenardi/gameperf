@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -9,10 +10,10 @@ import (
 
 // IRQEntry holds the interrupt counts per CPU for a single IRQ line.
 type IRQEntry struct {
-	Number   string
-	Name     string
-	PerCPU   []int64
-	Total    int64
+	Number string
+	Name   string
+	PerCPU []int64
+	Total  int64
 }
 
 // CollectIRQs reads /proc/interrupts and returns all IRQ entries.
@@ -22,8 +23,13 @@ func CollectIRQs() ([]IRQEntry, int, error) {
 		return nil, 0, err
 	}
 	defer f.Close()
+	return ParseIRQs(f)
+}
 
-	scanner := bufio.NewScanner(f)
+// ParseIRQs parses the /proc/interrupts format from any io.Reader.
+// Exposed for testing.
+func ParseIRQs(r io.Reader) ([]IRQEntry, int, error) {
+	scanner := bufio.NewScanner(r)
 
 	// First line is the CPU header — count CPUs.
 	scanner.Scan()
