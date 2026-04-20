@@ -123,7 +123,26 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
 git clone https://github.com/zenardi/gameperf.git
 cd gameperf
 make build          # produces dist/gameperf
-make install        # installs to $GOPATH/bin
+make install        # installs to $(go env GOPATH)/bin
+```
+
+After `make install`, ensure Go's bin directory is in your `$PATH`.
+Add this line to your shell config (`~/.zshrc`, `~/.bashrc`, etc.) if it isn't already:
+
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+Then reload your shell:
+
+```bash
+source ~/.zshrc   # or source ~/.bashrc
+```
+
+You can verify the install worked with:
+
+```bash
+gameperf --help
 ```
 
 ### Run without installing

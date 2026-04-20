@@ -19,9 +19,20 @@ run: build
 serve: build
 	$(BUILD_DIR)/$(BINARY) serve $(ARGS)
 
-## install: install binary to GOPATH/bin
+## install: install binary to GOPATH/bin (ensure $(go env GOPATH)/bin is in PATH)
 install:
 	go install -ldflags "$(LDFLAGS)" ./cmd/gameperf
+	@echo ""
+	@echo "  Installed to $$(go env GOPATH)/bin/$(BINARY)"
+	@if ! echo "$$PATH" | grep -q "$$(go env GOPATH)/bin"; then \
+		echo ""; \
+		echo "  WARNING: $$(go env GOPATH)/bin is not in your PATH."; \
+		echo "  Add this to your shell config (~/.zshrc or ~/.bashrc):"; \
+		echo ""; \
+		echo "    export PATH=\$$PATH:$$(go env GOPATH)/bin"; \
+		echo ""; \
+		echo "  Then reload: source ~/.zshrc"; \
+	fi
 
 ## test: run all tests
 test:
