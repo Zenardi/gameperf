@@ -6,6 +6,47 @@ Real-time game performance diagnostics and auto-fix tool for Linux.
 
 Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game.
 
+- [gameperf](#gameperf)
+  - [Features](#features)
+  - [Requirements](#requirements)
+  - [Installation](#installation)
+    - [Build from source](#build-from-source)
+    - [Run without installing](#run-without-installing)
+  - [Usage](#usage)
+    - [`diagnose` — one-shot analysis](#diagnose--one-shot-analysis)
+    - [`fix` — diagnose and apply all auto-fixable issues](#fix--diagnose-and-apply-all-auto-fixable-issues)
+    - [`monitor` — continuous re-diagnosis](#monitor--continuous-re-diagnosis)
+    - [`report` — write a full report to a file](#report--write-a-full-report-to-a-file)
+    - [`serve` — Prometheus metrics endpoint](#serve--prometheus-metrics-endpoint)
+    - [Common flags](#common-flags)
+  - [Prometheus + Grafana monitoring stack](#prometheus--grafana-monitoring-stack)
+    - [Metrics exposed](#metrics-exposed)
+    - [Quickstart](#quickstart)
+    - [Existing Prometheus setup](#existing-prometheus-setup)
+  - [LLM-powered analysis](#llm-powered-analysis)
+    - [Mode 1 — Ollama (local, free, recommended)](#mode-1--ollama-local-free-recommended)
+    - [Mode 2 — OpenAI (cloud, requires API key)](#mode-2--openai-cloud-requires-api-key)
+    - [Mode 3 — Google Gemini (cloud, requires API key)](#mode-3--google-gemini-cloud-requires-api-key)
+    - [Mode 4 — Anthropic Claude (cloud, requires API key)](#mode-4--anthropic-claude-cloud-requires-api-key)
+    - [Config file reference](#config-file-reference)
+    - [CLI flag overrides](#cli-flag-overrides)
+    - [What the LLM does and does not do](#what-the-llm-does-and-does-not-do)
+  - [Diagnostic rules](#diagnostic-rules)
+    - [`irq-ecore-*` — GPU IRQ routed to E-core 🔴 Critical](#irq-ecore---gpu-irq-routed-to-e-core--critical)
+    - [`vram-pressure` — VRAM near full 🟡 Warning / 🔴 Critical](#vram-pressure--vram-near-full--warning---critical)
+    - [`game-not-running` — no game process found 🔵 Info](#game-not-running--no-game-process-found--info)
+    - [`cpu-governor-powersave` — P-cores using powersave governor 🔴 Critical](#cpu-governor-powersave--p-cores-using-powersave-governor--critical)
+    - [`vm-max-map-count` — Max memory map count too low 🟡 Warning](#vm-max-map-count--max-memory-map-count-too-low--warning)
+    - [`thp-always` — Transparent Huge Pages set to 'always' 🟡 Warning](#thp-always--transparent-huge-pages-set-to-always--warning)
+    - [`swap-pressure` — High swap usage 🟡 Warning / 🔴 Critical](#swap-pressure--high-swap-usage--warning---critical)
+    - [`ram-pressure` — Low available RAM 🟡 Warning](#ram-pressure--low-available-ram--warning)
+    - [`cpu-throttling` — P-cores throttled below max frequency 🟡 Warning](#cpu-throttling--p-cores-throttled-below-max-frequency--warning)
+    - [`irqbalance-missing` — irqbalance not running 🟡 Warning](#irqbalance-missing--irqbalance-not-running--warning)
+  - [Architecture](#architecture)
+  - [Development](#development)
+  - [Known limitations](#known-limitations)
+
+
 ---
 
 ## Features
@@ -27,13 +68,50 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
 
 ---
 
-## Requirements
+## Prerequisites
 
-- Linux (x86-64)
-- Go 1.24+ (to build from source)
-- NVIDIA GPU: `nvidia-smi` must be on `$PATH` for GPU metrics
-- Root or `sudo` access for IRQ affinity fixes
-- Docker + Docker Compose (optional, for the Prometheus/Grafana monitoring stack)
+### Required
+
+| Dependency | Why | Install |
+|---|---|---|
+| **Linux x86-64** | Only supported OS | — |
+| **Go 1.24+** | Build from source | [go.dev/dl](https://go.dev/dl/) |
+
+### Runtime tools (auto-fixes won't work without these)
+
+| Tool | Used for | Install (Debian/Ubuntu) | Install (Arch/Fedora) |
+|---|---|---|---|
+| `sudo` | Applying privileged fixes | pre-installed | pre-installed |
+| `sysctl` | Fixing `vm.max_map_count` | `procps` | `procps-ng` |
+| `systemctl` | Enabling `irqbalance` service | `systemd` | `systemd` |
+| `irqbalance` | IRQ affinity balancing | `apt install irqbalance` | `pacman -S irqbalance` / `dnf install irqbalance` |
+| `cpupower` | Persisting CPU governor changes (optional) | `apt install linux-tools-common` | `pacman -S cpupower` / `dnf install kernel-tools` |
+| `lm-sensors` / `sensors` | CPU temperature readings (manual fix hints) | `apt install lm-sensors` | `pacman -S lm_sensors` / `dnf install lm_sensors` |
+
+> **Note:** gameperf reads `/proc` and `/sys` directly for most diagnostics — the tools above are only needed when *applying* fixes.
+
+### GPU metrics (optional)
+
+| GPU | Requirement |
+|---|---|
+| NVIDIA | `nvidia-smi` on `$PATH` — included in the [NVIDIA driver package](https://www.nvidia.com/drivers) |
+| AMD / Intel | Not yet supported — metrics will show `0` |
+
+### Monitoring stack (optional)
+
+| Tool | Why | Install |
+|---|---|---|
+| **Docker** | Run Prometheus + Grafana | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| **Docker Compose** | One-command stack spin-up | Bundled with Docker Desktop; `apt install docker-compose-plugin` on Linux |
+
+### LLM analysis (optional)
+
+| Provider | Requirement |
+|---|---|
+| Ollama (local) | [ollama.com](https://ollama.com) installed and running |
+| OpenAI | API key from [platform.openai.com](https://platform.openai.com/api-keys) |
+| Google Gemini | API key from [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| Anthropic Claude | API key from [console.anthropic.com](https://console.anthropic.com/) |
 
 ---
 
