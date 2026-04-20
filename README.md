@@ -22,6 +22,7 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
 - **Three output formats** — human-friendly console, Markdown report, and JSON for scripting
 - **Auto-fix support** — safe fixes are applied in one command (`gameperf fix --sudo`)
 - **Continuous monitoring** — re-diagnoses on a configurable interval with `monitor`
+- **Prometheus + Grafana integration** — expose all metrics in real-time via `gameperf serve`, visualise with the bundled Grafana dashboard using a single `docker compose up`
 
 ---
 
@@ -31,6 +32,7 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
 - Go 1.24+ (to build from source)
 - NVIDIA GPU: `nvidia-smi` must be on `$PATH` for GPU metrics
 - Root or `sudo` access for IRQ affinity fixes
+- Docker + Docker Compose (optional, for the Prometheus/Grafana monitoring stack)
 
 ---
 
@@ -84,6 +86,17 @@ gameperf report                             # writes gameperf-report.md
 gameperf report --output /tmp/report.json --format json
 ```
 
+### `serve` — Prometheus metrics endpoint
+
+```bash
+gameperf serve                              # listen on :9100, collect every 5s
+gameperf serve --port 9200 --interval 2    # custom port and interval
+```
+
+Exposes all real-time metrics at `http://localhost:9100/metrics` in Prometheus
+exposition format. Point your Prometheus instance at it, or spin up the full
+Prometheus + Grafana monitoring stack with one command (see below).
+
 ### Common flags
 
 | Flag | Default | Description |
@@ -94,6 +107,69 @@ gameperf report --output /tmp/report.json --format json
 | `--sudo` | `false` | Prepend `sudo` to fix commands that require root |
 | `--interval` | `10` | Seconds between runs (`monitor` only) |
 | `--output` | `gameperf-report.md` | Output file path (`report` only) |
+| `--port` | `9100` | Port for the `/metrics` HTTP server (`serve` only) |
+| `--interval` | `5` | Seconds between collections (`serve` only) |
+
+---
+
+## Prometheus + Grafana monitoring stack
+
+`gameperf serve` exposes all metrics in real-time. The repo ships a complete
+Docker Compose stack that wires Prometheus and Grafana together automatically —
+no manual configuration needed.
+
+### Metrics exposed
+
+| Metric | Type | Description |
+|---|---|---|
+| `gameperf_cpu_usage_percent{core}` | Gauge | Per-core CPU usage (delta between collections) |
+| `gameperf_cpu_governor_info{core,governor}` | Gauge | Active scaling governor per core (value=1) |
+| `gameperf_cpu_throttle_percent{core}` | Gauge | How far below rated frequency each P-core is running |
+| `gameperf_gpu_vram_used_mib` | Gauge | GPU VRAM used in MiB |
+| `gameperf_gpu_vram_total_mib` | Gauge | GPU VRAM total capacity in MiB |
+| `gameperf_gpu_vram_used_percent` | Gauge | GPU VRAM used as % of total |
+| `gameperf_ram_available_percent` | Gauge | RAM available as % of total |
+| `gameperf_swap_used_percent` | Gauge | Swap used as % of total swap |
+| `gameperf_vm_max_map_count` | Gauge | Current value of `vm.max_map_count` |
+| `gameperf_finding_active{id,severity}` | Gauge | 1 when a diagnostic rule is currently firing |
+
+### Quickstart
+
+**Step 1 — start the metrics server** (on your gaming machine):
+
+```bash
+gameperf serve                          # exposes http://localhost:9100/metrics
+```
+
+**Step 2 — start Prometheus + Grafana**:
+
+```bash
+docker compose up -d
+```
+
+| Service | URL | Credentials |
+|---|---|---|
+| Grafana | http://localhost:3000 | admin / gameperf |
+| Prometheus | http://localhost:9090 | — |
+
+The bundled dashboard (`grafana/dashboard.json`) is provisioned automatically.
+It includes panels for CPU usage, CPU governors, CPU throttle, GPU VRAM,
+RAM/swap pressure, vm.max_map_count, and a live active-findings table.
+
+### Existing Prometheus setup
+
+If you already run Prometheus, add this scrape job to your config:
+
+```yaml
+scrape_configs:
+  - job_name: gameperf
+    static_configs:
+      - targets: ["<your-machine-ip>:9100"]
+    scrape_interval: 5s
+```
+
+Then import `grafana/dashboard.json` into your existing Grafana instance via
+**Dashboards → Import → Upload JSON file**.
 
 ---
 
@@ -174,17 +250,27 @@ Without irqbalance, all hardware interrupts default to CPU0. Under gaming load (
 ```
 gameperf/
 ├── cmd/gameperf/         # CLI entry point (cobra)
+├── docker-compose.yml    # Prometheus + Grafana stack
+├── prometheus/
+│   └── gameperf.yml      # Prometheus scrape config
+├── grafana/
+│   ├── dashboard.json    # Pre-built Grafana dashboard
+│   └── provisioning/     # Auto-provisioned datasource + dashboard
 └── internal/
     ├── collector/        # Low-level metric readers
     │   ├── irq.go        # /proc/interrupts parser
     │   ├── cpu.go        # /proc/stat + /proc/cpuinfo parser
     │   ├── gpu.go        # nvidia-smi CSV parser
+    │   ├── memory.go     # /proc/meminfo + THP parser
+    │   ├── sysctl.go     # CPU governor + freq + vm.max_map_count
     │   └── process.go    # /proc/<pid>/comm scanner
     ├── analyzer/         # Diagnostic rules engine
     │   ├── finding.go    # Finding, Report, Severity types
     │   └── analyzer.go   # Collect() + Analyze() + rules
     ├── fixer/            # Fix executor
     │   └── fixer.go      # Apply() / ApplyAll()
+    ├── metrics/          # Prometheus metrics registry
+    │   └── metrics.go    # Metrics struct, UpdateFromSnapshot, Handler
     └── report/           # Output formatters
         └── report.go     # WriteConsole / WriteMarkdown / WriteJSON
 ```

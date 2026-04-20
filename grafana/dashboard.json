@@ -1,0 +1,437 @@
+{
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0"},
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0"},
+    {"type": "panel", "id": "timeseries", "name": "Time series", "version": ""},
+    {"type": "panel", "id": "gauge", "name": "Gauge", "version": ""},
+    {"type": "panel", "id": "stat", "name": "Stat", "version": ""},
+    {"type": "panel", "id": "table", "name": "Table", "version": ""}
+  ],
+  "title": "gameperf — Linux Game Performance",
+  "uid": "gameperf-v1",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "tags": ["gameperf", "gaming", "linux"],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Game Status",
+      "collapsed": false,
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Game Running",
+      "gridPos": {"x": 0, "y": 1, "w": 6, "h": 4},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "Running ✅", "color": "green"}, "1": {"text": "Not detected ⚠️", "color": "yellow"}}}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_finding_active{id=\"game-not-running\"}",
+          "legendFormat": "Status",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Active Findings",
+      "gridPos": {"x": 6, "y": 1, "w": 6, "h": 4},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 3}]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "count(gameperf_finding_active) or vector(0)",
+          "legendFormat": "Findings",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Critical Findings",
+      "gridPos": {"x": 12, "y": 1, "w": 6, "h": 4},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "count(gameperf_finding_active{severity=\"critical\"}) or vector(0)",
+          "legendFormat": "Critical",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "vm.max_map_count",
+      "gridPos": {"x": 18, "y": 1, "w": 6, "h": 4},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "green", "value": 524288}]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_vm_max_map_count",
+          "legendFormat": "vm.max_map_count",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "CPU",
+      "collapsed": false,
+      "gridPos": {"x": 0, "y": 5, "w": 24, "h": 1}
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "CPU Usage per Core (%)",
+      "gridPos": {"x": 0, "y": 6, "w": 12, "h": 8},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]
+          },
+          "custom": {"lineWidth": 1, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_cpu_usage_percent",
+          "legendFormat": "core {{core}}"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "CPU Throttle per Core (%)",
+      "gridPos": {"x": 12, "y": 6, "w": 12, "h": 8},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 40}]
+          },
+          "custom": {"lineWidth": 1, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_cpu_throttle_percent",
+          "legendFormat": "core {{core}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "table",
+      "title": "CPU Governors",
+      "gridPos": {"x": 0, "y": 14, "w": 12, "h": 5},
+      "options": {"sortBy": [{"displayName": "core", "desc": false}]},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "governor"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {"type": "value", "options": {"performance": {"color": "green", "index": 0}, "powersave": {"color": "red", "index": 1}}}
+                ]
+              },
+              {"id": "custom.displayMode", "value": "color-background"}
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "gameperf_cpu_governor_info",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {"id": "filterFieldsByName", "options": {"include": {"names": ["core", "governor", "Value"]}}}
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "GPU",
+      "collapsed": false,
+      "gridPos": {"x": 0, "y": 19, "w": 24, "h": 1}
+    },
+    {
+      "id": 21,
+      "type": "gauge",
+      "title": "VRAM Used (%)",
+      "gridPos": {"x": 0, "y": 20, "w": 6, "h": 8},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 75}, {"color": "red", "value": 90}]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_gpu_vram_used_percent",
+          "legendFormat": "VRAM %",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "VRAM Usage over Time",
+      "gridPos": {"x": 6, "y": 20, "w": 12, "h": 8},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "min": 0,
+          "custom": {"lineWidth": 2, "fillOpacity": 20}
+        }
+      },
+      "targets": [
+        {
+          "expr": "gameperf_gpu_vram_used_mib",
+          "legendFormat": "Used"
+        },
+        {
+          "expr": "gameperf_gpu_vram_total_mib",
+          "legendFormat": "Total"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "VRAM Total",
+      "gridPos": {"x": 18, "y": 20, "w": 6, "h": 4},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "colorMode": "none",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {"unit": "decmbytes"}
+      },
+      "targets": [
+        {"expr": "gameperf_gpu_vram_total_mib", "legendFormat": "Total VRAM", "instant": true}
+      ]
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Memory",
+      "collapsed": false,
+      "gridPos": {"x": 0, "y": 28, "w": 24, "h": 1}
+    },
+    {
+      "id": 31,
+      "type": "gauge",
+      "title": "RAM Available (%)",
+      "gridPos": {"x": 0, "y": 29, "w": 8, "h": 8},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "orientation": "auto",
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 15}, {"color": "green", "value": 30}]
+          }
+        }
+      },
+      "targets": [
+        {"expr": "gameperf_ram_available_percent", "legendFormat": "RAM Available", "instant": true}
+      ]
+    },
+    {
+      "id": 32,
+      "type": "gauge",
+      "title": "Swap Used (%)",
+      "gridPos": {"x": 8, "y": 29, "w": 8, "h": 8},
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"]},
+        "orientation": "auto",
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 50}, {"color": "red", "value": 80}]
+          }
+        }
+      },
+      "targets": [
+        {"expr": "gameperf_swap_used_percent", "legendFormat": "Swap Used", "instant": true}
+      ]
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "RAM & Swap Pressure over Time",
+      "gridPos": {"x": 16, "y": 29, "w": 8, "h": 8},
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom"},
+        "tooltip": {"mode": "multi"}
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": {"lineWidth": 2, "fillOpacity": 10}
+        }
+      },
+      "targets": [
+        {"expr": "100 - gameperf_ram_available_percent", "legendFormat": "RAM Used %"},
+        {"expr": "gameperf_swap_used_percent", "legendFormat": "Swap Used %"}
+      ]
+    },
+    {
+      "id": 40,
+      "type": "row",
+      "title": "Active Findings",
+      "collapsed": false,
+      "gridPos": {"x": 0, "y": 37, "w": 24, "h": 1}
+    },
+    {
+      "id": 41,
+      "type": "table",
+      "title": "Active Diagnostic Findings",
+      "gridPos": {"x": 0, "y": 38, "w": 24, "h": 8},
+      "options": {"sortBy": [{"displayName": "severity", "desc": false}]},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "severity"},
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {"type": "value", "options": {
+                    "critical": {"color": "red", "index": 0},
+                    "warning": {"color": "yellow", "index": 1},
+                    "info": {"color": "blue", "index": 2}
+                  }}
+                ]
+              },
+              {"id": "custom.displayMode", "value": "color-background"}
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "gameperf_finding_active",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {"id": "filterFieldsByName", "options": {"include": {"names": ["id", "severity", "Value"]}}}
+      ]
+    }
+  ]
+}

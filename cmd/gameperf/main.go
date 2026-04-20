@@ -73,7 +73,7 @@ and produces detailed reports with auto-fix support.`,
 	reportCmd.Flags().StringVar(&flagFormat, "format", "markdown", "Output format: console, markdown, json")
 	reportCmd.Flags().StringVar(&flagOutput, "output", "gameperf-report.md", "Output file path")
 
-	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd)
+	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd, newServeCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
