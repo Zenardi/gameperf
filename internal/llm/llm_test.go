@@ -27,11 +27,15 @@ type mockProvider struct {
 	err        error
 	called     bool
 	lastPrompt string
+	completeFn func(context.Context, string) (string, error) // optional override
 }
 
-func (m *mockProvider) Complete(_ context.Context, prompt string) (string, error) {
+func (m *mockProvider) Complete(ctx context.Context, prompt string) (string, error) {
 	m.called = true
 	m.lastPrompt = prompt
+	if m.completeFn != nil {
+		return m.completeFn(ctx, prompt)
+	}
 	return m.response, m.err
 }
 func (m *mockProvider) Name() string { return m.name }
@@ -561,6 +565,94 @@ func TestAnthropicProvider_Complete_EmptyContent(t *testing.T) {
 	_, err := p.Complete(context.Background(), "test")
 	if err == nil {
 		t.Fatal("expected error when content is empty")
+	}
+}
+
+// ── AnalyzeFile ───────────────────────────────────────────────────────────────
+
+func TestAnalyzeFile_SendsFileContentsToLLM(t *testing.T) {
+	t.Parallel()
+	received := ""
+	mock := &mockProvider{
+		completeFn: func(_ context.Context, prompt string) (string, error) {
+			received = prompt
+			return "file analysis result", nil
+		},
+	}
+
+	content := "# gameperf Report\n\n## Findings\n- Critical: cpu governor is powersave"
+	tmp := filepath.Join(t.TempDir(), "report.md")
+	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := llm.AnalyzeFile(context.Background(), mock, tmp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "file analysis result" {
+		t.Errorf("got %q, want 'file analysis result'", result)
+	}
+	if !strings.Contains(received, content) {
+		t.Errorf("prompt should contain file contents; got:\n%s", received)
+	}
+}
+
+func TestAnalyzeFile_PromptContainsFilename(t *testing.T) {
+	t.Parallel()
+	var capturedPrompt string
+	mock := &mockProvider{
+		completeFn: func(_ context.Context, prompt string) (string, error) {
+			capturedPrompt = prompt
+			return "ok", nil
+		},
+	}
+
+	tmp := filepath.Join(t.TempDir(), "my-report.md")
+	if err := os.WriteFile(tmp, []byte("some content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := llm.AnalyzeFile(context.Background(), mock, tmp); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(capturedPrompt, "my-report.md") {
+		t.Errorf("prompt should mention filename; got:\n%s", capturedPrompt)
+	}
+}
+
+func TestAnalyzeFile_ReturnsErrorForMissingFile(t *testing.T) {
+	t.Parallel()
+	mock := &mockProvider{
+		completeFn: func(_ context.Context, _ string) (string, error) {
+			return "should not be called", nil
+		},
+	}
+	_, err := llm.AnalyzeFile(context.Background(), mock, "/nonexistent/path/report.md")
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestAnalyzeFile_PropagatesProviderError(t *testing.T) {
+	t.Parallel()
+	mock := &mockProvider{
+		completeFn: func(_ context.Context, _ string) (string, error) {
+			return "", errors.New("provider unavailable")
+		},
+	}
+
+	tmp := filepath.Join(t.TempDir(), "report.md")
+	if err := os.WriteFile(tmp, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := llm.AnalyzeFile(context.Background(), mock, tmp)
+	if err == nil {
+		t.Fatal("expected error from provider")
+	}
+	if !strings.Contains(err.Error(), "provider unavailable") {
+		t.Errorf("error should contain provider message, got: %v", err)
 	}
 }
 

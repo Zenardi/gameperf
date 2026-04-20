@@ -184,6 +184,20 @@ gameperf report                             # writes gameperf-report.md
 gameperf report --output /tmp/report.json --format json
 ```
 
+### `analyze-file` — send a saved report to the LLM
+
+After a gaming session you may already have a report file on disk. Use this
+command to send it to the LLM **without needing to collect new metrics** — the
+game and gameperf do not need to be running.
+
+```bash
+gameperf analyze-file gameperf-report.md
+gameperf analyze-file /tmp/session.json --llm-provider gemini --llm-model gemini-1.5-flash
+```
+
+The file contents (markdown, JSON, or plain text) are sent verbatim to the
+LLM. The AI analysis is printed to stdout.
+
 ### `serve` — Prometheus metrics endpoint
 
 ```bash

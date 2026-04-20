@@ -80,7 +80,16 @@ and produces detailed reports with auto-fix support.`,
 	reportCmd.Flags().StringVar(&flagOutput, "output", "gameperf-report.md", "Output file path")
 	addLLMFlags(reportCmd)
 
-	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd, newServeCmd())
+	// --- analyze-file ---
+	analyzeFileCmd := &cobra.Command{
+		Use:   "analyze-file <report-file>",
+		Short: "Send an existing report file to the LLM for analysis",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runAnalyzeFile,
+	}
+	addLLMFlags(analyzeFileCmd)
+
+	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd, analyzeFileCmd, newServeCmd())
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -256,5 +265,38 @@ func runLLMEnhance(r report.FullReport, w *os.File) error {
 	fmt.Fprintln(w, "## 🤖 AI Analysis")
 	fmt.Fprintln(w, strings.TrimSpace(analysis))
 	fmt.Fprintln(w)
+	return nil
+}
+
+// runAnalyzeFile reads an existing report file from disk and sends it to the
+// configured LLM provider for analysis. No live collection is done — the game
+// and gameperf do not need to be running.
+func runAnalyzeFile(_ *cobra.Command, args []string) error {
+	filePath := args[0]
+
+	cfg, err := llm.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("load llm config: %w", err)
+	}
+	if flagLLMProvider != "" {
+		cfg.Provider = flagLLMProvider
+	}
+	if flagLLMModel != "" {
+		cfg.Model = flagLLMModel
+	}
+
+	provider, err := llm.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("create llm provider: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "🤖  Sending %s to %s for analysis…\n", filePath, provider.Name())
+	analysis, err := llm.AnalyzeFile(context.Background(), provider, filePath)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("## 🤖 AI Analysis")
+	fmt.Println(strings.TrimSpace(analysis))
 	return nil
 }

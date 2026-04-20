@@ -3,6 +3,8 @@ package llm
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/zenardi/gameperf/internal/report"
@@ -47,8 +49,28 @@ func BuildPrompt(r report.FullReport) string {
 	return sb.String()
 }
 
-// EnhanceReport sends the full report to the LLM provider and returns the
-// model's analysis as a plain string. The caller decides how to format/display it.
+// AnalyzeFile reads a report file from disk and sends its contents to the LLM
+// provider for analysis. The file can be any format (markdown, JSON, plain
+// text) — its raw content is embedded in the prompt unchanged.
+func AnalyzeFile(ctx context.Context, p Provider, path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read file %q: %w", path, err)
+	}
+
+	var sb strings.Builder
+	sb.WriteString(systemContext)
+	sb.WriteString("\n\n---\n\n")
+	sb.WriteString(fmt.Sprintf("The following is a gameperf report file (%s):\n\n", filepath.Base(path)))
+	sb.Write(data)
+	sb.WriteString("\n\n---\n\nProvide your expert analysis and prioritized recommendations:")
+
+	response, err := p.Complete(ctx, sb.String())
+	if err != nil {
+		return "", fmt.Errorf("llm %s: %w", p.Name(), err)
+	}
+	return response, nil
+}
 func EnhanceReport(ctx context.Context, p Provider, r report.FullReport) (string, error) {
 	prompt := BuildPrompt(r)
 	response, err := p.Complete(ctx, prompt)
