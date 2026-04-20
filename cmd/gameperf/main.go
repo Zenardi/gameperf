@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/zenardi/gameperf/internal/analyzer"
 	"github.com/zenardi/gameperf/internal/fixer"
+	"github.com/zenardi/gameperf/internal/llm"
 	"github.com/zenardi/gameperf/internal/report"
 )
 
@@ -19,6 +21,11 @@ var (
 	flagAutoFix  bool
 	flagSudo     bool
 	flagInterval int
+
+	// LLM flags
+	flagLLM         bool
+	flagLLMProvider string
+	flagLLMModel    string
 )
 
 var defaultGameNames = []string{
@@ -43,6 +50,7 @@ and produces detailed reports with auto-fix support.`,
 	addCommonFlags(diagnoseCmd)
 	diagnoseCmd.Flags().BoolVar(&flagAutoFix, "fix", false, "Automatically apply all safe fixes after diagnosing")
 	diagnoseCmd.Flags().BoolVar(&flagSudo, "sudo", false, "Prepend sudo to fix commands that require root")
+	addLLMFlags(diagnoseCmd)
 
 	// --- fix ---
 	fixCmd := &cobra.Command{
@@ -72,6 +80,7 @@ and produces detailed reports with auto-fix support.`,
 	reportCmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
 	reportCmd.Flags().StringVar(&flagFormat, "format", "markdown", "Output format: console, markdown, json")
 	reportCmd.Flags().StringVar(&flagOutput, "output", "gameperf-report.md", "Output file path")
+	addLLMFlags(reportCmd)
 
 	root.AddCommand(diagnoseCmd, fixCmd, monitorCmd, reportCmd, newServeCmd())
 
@@ -83,6 +92,12 @@ and produces detailed reports with auto-fix support.`,
 func addCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
 	cmd.Flags().StringVar(&flagFormat, "format", "console", "Output format: console, markdown, json")
+}
+
+func addLLMFlags(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&flagLLM, "llm", false, "Enhance output with an LLM analysis (requires Ollama or an API key)")
+	cmd.Flags().StringVar(&flagLLMProvider, "llm-provider", "", "Override LLM provider: ollama, openai (default: from config)")
+	cmd.Flags().StringVar(&flagLLMModel, "llm-model", "", "Override LLM model name (default: from config)")
 }
 
 func runDiagnose(cmd *cobra.Command, _ []string) error {
@@ -105,7 +120,10 @@ func runDiagnose(cmd *cobra.Command, _ []string) error {
 		Applied:     applied,
 	}
 
-	return writeReport(r)
+	if err := writeReport(r); err != nil {
+		return err
+	}
+	return runLLMEnhance(r, os.Stdout)
 }
 
 func runFix(cmd *cobra.Command, _ []string) error {
@@ -166,6 +184,14 @@ func runReport(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Append LLM analysis to the report file when --llm is set.
+	if flagLLM {
+		if aiErr := runLLMEnhance(r, f); aiErr != nil {
+			fmt.Fprintf(os.Stderr, "llm: %v\n", aiErr)
+		}
+	}
+
 	fmt.Printf("Report written to %s\n", flagOutput)
 	return nil
 }
@@ -179,5 +205,42 @@ func writeReport(r report.FullReport) error {
 	default:
 		report.WriteConsole(os.Stdout, r)
 	}
+	return nil
+}
+
+// runLLMEnhance loads the LLM provider, calls EnhanceReport, and writes the
+// AI analysis to w. It is a no-op when --llm is not set.
+func runLLMEnhance(r report.FullReport, w *os.File) error {
+	if !flagLLM {
+		return nil
+	}
+
+	cfg, err := llm.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("load llm config: %w", err)
+	}
+	// CLI flags override config file.
+	if flagLLMProvider != "" {
+		cfg.Provider = flagLLMProvider
+	}
+	if flagLLMModel != "" {
+		cfg.Model = flagLLMModel
+	}
+
+	provider, err := llm.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("create llm provider: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "🤖  Asking %s for analysis…\n", provider.Name())
+	analysis, err := llm.EnhanceReport(context.Background(), provider, r)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "## 🤖 AI Analysis")
+	fmt.Fprintln(w, strings.TrimSpace(analysis))
+	fmt.Fprintln(w)
 	return nil
 }

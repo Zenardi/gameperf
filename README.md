@@ -23,6 +23,7 @@ Built with FF7 Rebirth on Proton/Steam in mind, but applicable to any Linux game
 - **Auto-fix support** — safe fixes are applied in one command (`gameperf fix --sudo`)
 - **Continuous monitoring** — re-diagnoses on a configurable interval with `monitor`
 - **Prometheus + Grafana integration** — expose all metrics in real-time via `gameperf serve`, visualise with the bundled Grafana dashboard using a single `docker compose up`
+- **LLM-powered analysis** — send the diagnostic report to an LLM (Ollama locally or OpenAI) for expert root-cause analysis and prioritised fix recommendations
 
 ---
 
@@ -109,6 +110,9 @@ Prometheus + Grafana monitoring stack with one command (see below).
 | `--output` | `gameperf-report.md` | Output file path (`report` only) |
 | `--port` | `9100` | Port for the `/metrics` HTTP server (`serve` only) |
 | `--interval` | `5` | Seconds between collections (`serve` only) |
+| `--llm` | `false` | Enhance output with AI analysis (`diagnose`, `report`) |
+| `--llm-provider` | *(from config)* | Override LLM provider: `ollama`, `openai` |
+| `--llm-model` | *(from config)* | Override LLM model name |
 
 ---
 
@@ -170,6 +174,71 @@ scrape_configs:
 
 Then import `grafana/dashboard.json` into your existing Grafana instance via
 **Dashboards → Import → Upload JSON file**.
+
+---
+
+## LLM-powered analysis
+
+`gameperf` can send the diagnostic report to an LLM and receive expert
+root-cause analysis with prioritised recommendations.
+
+### Mode 1 — Ollama (local, free, recommended)
+
+No API key, no internet. Everything runs on your machine.
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.2
+
+# Run gameperf with AI analysis
+gameperf diagnose --llm
+gameperf report --llm          # AI section appended to the markdown file
+```
+
+### Mode 2 — OpenAI (cloud, requires API key)
+
+```bash
+# Store your key in the config file (never use it as a CLI flag)
+mkdir -p ~/.config/gameperf
+cat > ~/.config/gameperf/config.toml << 'EOF'
+[llm]
+provider = "openai"
+model    = "gpt-4o-mini"
+api_key  = "sk-..."
+EOF
+
+gameperf diagnose --llm
+```
+
+### Config file reference
+
+`~/.config/gameperf/config.toml` — created manually, never auto-generated.
+
+```toml
+[llm]
+provider = "ollama"           # "ollama" (default) or "openai"
+model    = "llama3.2"         # any model available in your provider
+api_key  = ""                 # required for openai; leave empty for ollama
+url      = ""                 # override base URL; empty = provider default
+```
+
+### CLI flag overrides
+
+Flags take precedence over the config file for one-off overrides:
+
+```bash
+gameperf diagnose --llm --llm-provider openai --llm-model gpt-4o
+```
+
+### What the LLM does and does not do
+
+| ✅ Does | ❌ Does not |
+|---|---|
+| Analyse finding interactions and root causes | Execute any shell commands |
+| Prioritise fixes by impact | Auto-apply fixes (that's the deterministic fixer) |
+| Explain why a metric is concerning | Access the internet during analysis |
+| Suggest in-game or system changes | Store or transmit your API key |
 
 ---
 
@@ -271,6 +340,12 @@ gameperf/
     │   └── fixer.go      # Apply() / ApplyAll()
     ├── metrics/          # Prometheus metrics registry
     │   └── metrics.go    # Metrics struct, UpdateFromSnapshot, Handler
+    ├── llm/              # LLM provider abstraction
+    │   ├── llm.go        # Provider interface
+    │   ├── config.go     # LLMConfig, LoadConfig, NewFromConfig
+    │   ├── enhance.go    # BuildPrompt, EnhanceReport
+    │   ├── ollama.go     # Ollama HTTP client
+    │   └── openai.go     # OpenAI chat completions client
     └── report/           # Output formatters
         └── report.go     # WriteConsole / WriteMarkdown / WriteJSON
 ```
