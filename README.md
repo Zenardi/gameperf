@@ -199,7 +199,7 @@ Prometheus + Grafana monitoring stack with one command (see below).
 
 | Flag | Default | Description |
 |---|---|---|
-| `--game` | `ff7rebirth,ff7,final fantasy` | Process name substrings to watch |
+| `--game` | *(auto-detect)* | Override auto-detected game (process name substrings) |
 | `--format` | `console` (`markdown` for `report`) | Output format: `console`, `markdown`, `json` |
 | `--fix` | `false` | Auto-apply fixes after diagnosing (`diagnose` only) |
 | `--sudo` | `false` | Prepend `sudo` to fix commands that require root |
@@ -208,8 +208,27 @@ Prometheus + Grafana monitoring stack with one command (see below).
 | `--port` | `9100` | Port for the `/metrics` HTTP server (`serve` only) |
 | `--interval` | `5` | Seconds between collections (`serve` only) |
 | `--llm` | `false` | Enhance output with AI analysis (`diagnose`, `report`) |
-| `--llm-provider` | *(from config)* | Override LLM provider: `ollama`, `openai` |
+| `--llm-provider` | *(from config)* | Override LLM provider: `ollama`, `openai`, `gemini`, `anthropic` |
 | `--llm-model` | *(from config)* | Override LLM model name |
+
+### Game auto-detection
+
+gameperf automatically detects running games without any configuration by inspecting `/proc` for:
+
+| Signal | What it covers |
+|---|---|
+| `SteamAppId` env var | Any game launched by Steam (native Linux or Proton) |
+| exe path under `steamapps/common/` | Native Steam games not setting the env var |
+| `LUTRIS_GAME_UUID` env var | Games launched via Lutris |
+
+Steam infrastructure processes (`steamwebhelper`, `reaper`, `pressure-vessel`, etc.) are automatically excluded.
+
+If no game is auto-detected, `--game` can be used as a manual override:
+
+```bash
+gameperf diagnose --game cyberpunk2077
+gameperf diagnose --game elden,ring   # comma-separated substrings
+```
 
 ---
 

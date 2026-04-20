@@ -28,9 +28,7 @@ var (
 	flagLLMModel    string
 )
 
-var defaultGameNames = []string{
-	"ff7rebirth", "ff7", "final fantasy",
-}
+var defaultGameNames = []string{} // auto-detection is tried first; this is the fallback name list
 
 func main() {
 	root := &cobra.Command{
@@ -77,7 +75,7 @@ and produces detailed reports with auto-fix support.`,
 		RunE:  runReport,
 	}
 	// report has its own --format flag: default is markdown, not console.
-	reportCmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
+	reportCmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Override auto-detected game (process name substrings); auto-detection used when empty")
 	reportCmd.Flags().StringVar(&flagFormat, "format", "markdown", "Output format: console, markdown, json")
 	reportCmd.Flags().StringVar(&flagOutput, "output", "gameperf-report.md", "Output file path")
 	addLLMFlags(reportCmd)
@@ -90,7 +88,7 @@ and produces detailed reports with auto-fix support.`,
 }
 
 func addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
+	cmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Override auto-detected game (process name substrings); auto-detection used when empty")
 	cmd.Flags().StringVar(&flagFormat, "format", "console", "Output format: console, markdown, json")
 }
 
@@ -104,6 +102,18 @@ func runDiagnose(cmd *cobra.Command, _ []string) error {
 	snap, err := analyzer.Collect(flagGames)
 	if err != nil {
 		return fmt.Errorf("collection error: %w", err)
+	}
+
+	if len(snap.GameProcs) > 0 {
+		names := make([]string, 0, len(snap.GameProcs))
+		seen := map[string]bool{}
+		for _, p := range snap.GameProcs {
+			if !seen[p.Name] {
+				names = append(names, p.Name)
+				seen[p.Name] = true
+			}
+		}
+		fmt.Fprintf(os.Stderr, "🎮  auto-detected game(s): %s\n", strings.Join(names, ", "))
 	}
 
 	findings := analyzer.Analyze(snap)
@@ -132,8 +142,12 @@ func runFix(cmd *cobra.Command, _ []string) error {
 }
 
 func runMonitor(cmd *cobra.Command, _ []string) error {
+	gameDesc := "any game (auto-detect)"
+	if len(flagGames) > 0 {
+		gameDesc = strings.Join(flagGames, ", ")
+	}
 	fmt.Fprintf(os.Stderr, "🎮  gameperf monitor — watching for %s every %ds\n",
-		strings.Join(flagGames, ", "), flagInterval)
+		gameDesc, flagInterval)
 
 	ticker := time.NewTicker(time.Duration(flagInterval) * time.Second)
 	defer ticker.Stop()

@@ -26,6 +26,9 @@ type Snapshot struct {
 }
 
 // Collect gathers all metrics into a snapshot.
+// When gameNames is empty, it attempts to auto-detect running games via
+// SteamAppId, steamapps/common paths, and Lutris signals before falling back
+// to the provided name list.
 func Collect(gameNames []string) (Snapshot, error) {
 	snap := Snapshot{Time: time.Now()}
 	var err error
@@ -48,9 +51,11 @@ func Collect(gameNames []string) (Snapshot, error) {
 			return snap, fmt.Errorf("gpu: %w", err)
 		}
 	}
-	snap.GameProcs, err = collector.FindGameProcesses(gameNames)
-	if err != nil {
-		return snap, fmt.Errorf("process: %w", err)
+
+	// Auto-detect games first; fall back to name-based search if nothing found.
+	snap.GameProcs, err = collector.DetectGameProcesses("/proc")
+	if err != nil || len(snap.GameProcs) == 0 {
+		snap.GameProcs, _ = collector.FindGameProcesses(gameNames)
 	}
 
 	// Optional metrics — skip silently on error (VM/container environments may lack sysfs)

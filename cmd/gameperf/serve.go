@@ -34,7 +34,7 @@ bundled dashboard at grafana/dashboard.json, or spin up the full stack with:
     docker compose up -d`,
 		RunE: runServe,
 	}
-	cmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Game process name substrings to watch")
+	cmd.Flags().StringSliceVar(&flagGames, "game", defaultGameNames, "Override auto-detected game (process name substrings); auto-detection used when empty")
 	cmd.Flags().IntVar(&flagServePort, "port", 9100, "Port to expose /metrics on")
 	cmd.Flags().IntVar(&flagServeInterval, "interval", 5, "Seconds between metric collection cycles")
 	return cmd
