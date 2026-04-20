@@ -275,7 +275,21 @@ no manual configuration needed.
 gameperf serve                          # exposes http://localhost:9100/metrics
 ```
 
-**Step 2 — start Prometheus + Grafana**:
+**Step 2 — configure your host IP** (required for rootless Docker):
+
+```bash
+# Find your LAN/Wi-Fi IP (not 127.0.0.1)
+hostname -I | awk '{print $1}'
+
+# Create the .env file (already present if you cloned the repo)
+echo "HOST_IP=192.168.0.x" > .env      # replace with your actual IP
+```
+
+> **Why?** Prometheus runs inside Docker and cannot reach `localhost` on the
+> host when using rootless Docker. The `.env` file tells Docker Compose which
+> IP to use. The `.env` file is git-ignored so your IP is never committed.
+
+**Step 3 — start Prometheus + Grafana**:
 
 ```bash
 docker compose up -d
@@ -481,6 +495,7 @@ Without irqbalance, all hardware interrupts default to CPU0. Under gaming load (
 gameperf/
 ├── cmd/gameperf/         # CLI entry point (cobra)
 ├── docker-compose.yml    # Prometheus + Grafana stack
+├── .env.example          # Template for HOST_IP (copy to .env and fill in)
 ├── prometheus/
 │   └── gameperf.yml      # Prometheus scrape config
 ├── grafana/

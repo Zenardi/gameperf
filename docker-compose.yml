@@ -7,7 +7,7 @@ services:
     ports:
       - "9090:9090"
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "gameperf-host:${HOST_IP}"
     restart: unless-stopped
 
   grafana:
@@ -29,3 +29,4 @@ services:
 
 volumes:
   grafana-data:
+
