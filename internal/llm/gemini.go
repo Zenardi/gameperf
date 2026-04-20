@@ -72,7 +72,7 @@ func (p *GeminiProvider) Complete(ctx context.Context, prompt string) (string, e
 	}
 
 	// Gemini uses the API key as a query parameter, not an Authorization header.
-	endpoint := fmt.Sprintf("%s/v1beta/models/%s:generateContent?key=%s",
+	endpoint := fmt.Sprintf("%s/v1/models/%s:generateContent?key=%s",
 		p.url, p.model, p.apiKey)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
